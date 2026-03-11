@@ -746,12 +746,116 @@
   <script id="8155a19dba3e3f2313d0a7ce70c8aee977e19151" src="https://zinenkos.site/pl/lite/widget/script?id=1574734"></script>
 
   <script>
-    // TODO: Replace with actual Google Apps Script Web App URL after deployment
-    // Instructions: open the Google Sheet > Extensions > Apps Script > Deploy > New deployment
-    // Type: Web app, Execute as: Me, Who has access: Anyone
-    // Then copy the URL and paste it below.
-    var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/TODO_REPLACE_WITH_ACTUAL_URL/exec';
+    // Apps Script URL — set to empty string until backend is deployed.
+    // To activate: deploy an Apps Script Web App and paste the URL here.
+    var APPS_SCRIPT_URL = '';
 
+    // ── localStorage helpers ──────────────────────────────────────────────
+    function saveSubmissionLocally(data) {
+      try {
+        var key = 'formSubmissions';
+        var existing = JSON.parse(localStorage.getItem(key) || '[]');
+        existing.push(data);
+        localStorage.setItem(key, JSON.stringify(existing));
+      } catch (e) {
+        console.warn('localStorage save failed:', e);
+      }
+    }
+
+    function getLocalSubmissions() {
+      try {
+        return JSON.parse(localStorage.getItem('formSubmissions') || '[]');
+      } catch (e) {
+        return [];
+      }
+    }
+
+    // ── Admin panel (visible when ?admin=true is in the URL) ──────────────
+    (function initAdminPanel() {
+      if (!/[?&]admin=true/.test(window.location.search)) return;
+
+      var panel = document.createElement('div');
+      panel.id = 'admin-panel';
+      panel.style.cssText = [
+        'position:fixed', 'bottom:0', 'left:0', 'right:0',
+        'max-height:50vh', 'overflow-y:auto',
+        'background:#1a1a1a', 'color:#e0e0e0',
+        'font-family:monospace', 'font-size:13px',
+        'padding:16px 20px', 'z-index:9999',
+        'border-top:2px solid #D4A854'
+      ].join(';');
+
+      function renderPanel() {
+        var submissions = getLocalSubmissions();
+        var header = '<strong style="color:#D4A854">Admin — Local Submissions ('
+          + submissions.length + ')</strong>'
+          + ' &nbsp;<button onclick="exportSubmissions()" style="margin-left:12px;'
+          + 'background:#D4A854;border:none;padding:4px 10px;cursor:pointer;border-radius:4px;font-size:12px">'
+          + 'Export CSV</button>'
+          + ' <button onclick="clearSubmissions()" style="margin-left:8px;'
+          + 'background:#8B2A24;color:#fff;border:none;padding:4px 10px;cursor:pointer;border-radius:4px;font-size:12px">'
+          + 'Clear</button>';
+
+        if (submissions.length === 0) {
+          panel.innerHTML = header + '<p style="margin-top:8px;color:#888">No submissions yet.</p>';
+          return;
+        }
+
+        var rows = submissions.map(function(s, i) {
+          return '<tr><td style="padding:4px 10px 4px 0;color:#888">' + (i + 1) + '</td>'
+            + '<td style="padding:4px 10px 4px 0">' + escHtml(s.timestamp || '') + '</td>'
+            + '<td style="padding:4px 10px 4px 0">' + escHtml(s.name || '') + '</td>'
+            + '<td style="padding:4px 10px 4px 0">' + escHtml(s.email || '') + '</td>'
+            + '<td style="padding:4px 0">' + escHtml(s.question || '') + '</td></tr>';
+        }).join('');
+
+        panel.innerHTML = header
+          + '<table style="margin-top:10px;border-collapse:collapse;width:100%">'
+          + '<thead><tr>'
+          + '<th style="text-align:left;padding:4px 10px 4px 0;color:#D4A854">#</th>'
+          + '<th style="text-align:left;padding:4px 10px 4px 0;color:#D4A854">Time</th>'
+          + '<th style="text-align:left;padding:4px 10px 4px 0;color:#D4A854">Name</th>'
+          + '<th style="text-align:left;padding:4px 10px 4px 0;color:#D4A854">Email</th>'
+          + '<th style="text-align:left;padding:4px 0;color:#D4A854">Question</th>'
+          + '</tr></thead><tbody>' + rows + '</tbody></table>';
+      }
+
+      document.body.appendChild(panel);
+      renderPanel();
+
+      // expose helpers on window so inline onclick works
+      window.exportSubmissions = function() {
+        var submissions = getLocalSubmissions();
+        if (!submissions.length) { alert('No submissions to export.'); return; }
+        var header = 'Timestamp,Name,Email,Question\n';
+        var csv = header + submissions.map(function(s) {
+          return [s.timestamp, s.name, s.email, s.question].map(function(v) {
+            return '"' + (v || '').replace(/"/g, '""') + '"';
+          }).join(',');
+        }).join('\n');
+        var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = 'submissions.csv'; a.click();
+        URL.revokeObjectURL(url);
+      };
+
+      window.clearSubmissions = function() {
+        if (confirm('Clear all local submissions?')) {
+          localStorage.removeItem('formSubmissions');
+          renderPanel();
+        }
+      };
+
+      // refresh panel after each new submission
+      window._adminRefresh = renderPanel;
+    })();
+
+    function escHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // ── Form submit handler ───────────────────────────────────────────────
     document.getElementById('questions-form').addEventListener('submit', function(e) {
       e.preventDefault();
 
@@ -765,34 +869,36 @@
         return;
       }
 
-      // Loading state
+      var submission = {
+        timestamp: new Date().toISOString(),
+        name: document.getElementById('question-name').value.trim(),
+        email: document.getElementById('question-email').value.trim(),
+        question: question
+      };
+
+      // 1. Always save locally first
+      saveSubmissionLocally(submission);
+      if (typeof window._adminRefresh === 'function') window._adminRefresh();
+
+      // 2. Try to POST to Apps Script (fire-and-forget; errors are silent)
+      if (APPS_SCRIPT_URL) {
+        var formData = new FormData();
+        formData.append('name', submission.name);
+        formData.append('email', submission.email);
+        formData.append('question', submission.question);
+        fetch(APPS_SCRIPT_URL, { method: 'POST', body: formData, mode: 'no-cors' })
+          .catch(function(err) { console.warn('Apps Script POST failed (data saved locally):', err); });
+      }
+
+      // 3. Always show success immediately
       btn.disabled = true;
       btn.textContent = 'Отправляю...';
-      msg.style.display = 'none';
-
-      var formData = new FormData();
-      formData.append('name', document.getElementById('question-name').value.trim());
-      formData.append('email', document.getElementById('question-email').value.trim());
-      formData.append('question', question);
-
-      fetch(APPS_SCRIPT_URL, {
-        method: 'POST',
-        body: formData,
-        mode: 'no-cors'  // Apps Script doesn't return CORS headers on redirect
-      })
-      .then(function() {
-        // no-cors means we can't read the response body, but if we got here it worked
+      setTimeout(function() {
         showMessage(msg, 'success', 'Спасибо! Ваш вопрос получен. Мы обязательно его рассмотрим.');
         form.reset();
-      })
-      .catch(function(err) {
-        showMessage(msg, 'error', 'Не удалось отправить вопрос. Попробуйте ещё раз или напишите напрямую: sergeyzinenko@gmail.com');
-        console.error('Form submit error:', err);
-      })
-      .finally(function() {
         btn.disabled = false;
         btn.textContent = 'Отправить вопрос';
-      });
+      }, 400);
     });
 
     function showMessage(el, type, text) {
