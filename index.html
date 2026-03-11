@@ -525,7 +525,7 @@
         <div class="date-badge"><span>18 марта, 19:00 МСК</span> — мастер-класс «Антикризисная DeFi-система»</div>
       </div>
       <p class="no-recording-note">Записей не будет. Только живое участие.</p>
-      <a href="#" class="btn" onclick="return false;">Зарегистрироваться</a>
+      <a href="#register" class="btn">Зарегистрироваться</a>
     </div>
   </section>
 
@@ -696,42 +696,9 @@
         Заполните форму, чтобы получить ссылку на мероприятия.
       </p>
 
-      <!-- TODO: replace with actual GetCourse registration URL -->
-      <form action="https://zinenkos.site/TODO-REPLACE" method="POST" class="form-narrow">
-        <div class="form-group">
-          <label for="reg-name">Имя *</label>
-          <input
-            type="text"
-            id="reg-name"
-            name="name"
-            placeholder="Ваше имя"
-            required
-          >
-        </div>
-        <div class="form-group">
-          <label for="reg-email">Email *</label>
-          <input
-            type="email"
-            id="reg-email"
-            name="email"
-            placeholder="your@email.com"
-            required
-          >
-        </div>
-        <div class="form-group">
-          <label for="reg-phone">Телефон <span style="text-transform: none; font-weight: 400; letter-spacing: 0;">(необязательно)</span></label>
-          <input
-            type="tel"
-            id="reg-phone"
-            name="phone"
-            placeholder="+7 900 000 00 00"
-          >
-        </div>
-        <button type="submit" class="btn">Зарегистрироваться</button>
-        <p class="privacy-note">
-          Нажимая кнопку, вы соглашаетесь с обработкой персональных данных.
-        </p>
-      </form>
+      <div id="gc-widget-wrapper" style="overflow:visible">
+        <script id="8155a19dba3e3f2313d0a7ce70c8aee977e19151" src="https://zinenkos.site/pl/lite/widget/script?id=1574734"></script>
+      </div>
     </div>
   </section>
 
@@ -742,10 +709,6 @@
     Первый DeFi-Университет Сергея Зиненко, 2026
   </footer>
 
-
-  <div id="gc-widget-wrapper" style="overflow:visible">
-    <script id="8155a19dba3e3f2313d0a7ce70c8aee977e19151" src="https://zinenkos.site/pl/lite/widget/script?id=1574734"></script>
-  </div>
 
   <script>
     // Apps Script URL — set to empty string until backend is deployed.
